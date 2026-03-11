@@ -101,6 +101,15 @@ Route('/users/{user_id:int}', user, methods=["GET", "POST"])
 
 By default function endpoints will only accept `GET` requests, unless specified.
 
+`HEAD` requests are automatically supported for any route that handles `GET`. If you need custom `HEAD` handling, register an explicit `HEAD` route for the same path — it will take priority over the implicit one:
+
+```python
+routes = [
+    Route('/resource', get_handler, methods=["GET"]),
+    Route('/resource', head_handler, methods=["HEAD"]),  # takes priority for HEAD requests
+]
+```
+
 ## Submounting routes
 
 In large applications you might find that you want to break out parts of the

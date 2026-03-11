@@ -90,6 +90,7 @@ and [@codingjoe](https://github.com/codingjoe).
 * Avoid mutating `FileResponse` headers on range requests [#3144](https://github.com/encode/starlette/pull/3144).
 * Return explicit origin in CORS response when credentials are allowed [#3137](https://github.com/encode/starlette/pull/3137).
 * Enable `autoescape` by default in `Jinja2Templates` [#3148](https://github.com/encode/starlette/pull/3148).
+* Explicit `HEAD` routes now take priority over the implicit `HEAD` support added to `GET` routes [#3128](https://github.com/Kludex/starlette/discussions/3128).
 
 #### Changed
 
