@@ -101,6 +101,16 @@ Route('/users/{user_id:int}', user, methods=["GET", "POST"])
 
 By default function endpoints will only accept `GET` requests, unless specified.
 
+When a function endpoint handles `GET`, Starlette will also automatically allow
+`HEAD` requests for that route. If you need different behaviour for `HEAD`
+requests, you can add an explicit `HEAD` route for the same path, and it will
+take precedence over the implicit `HEAD` generated from the `GET` route:
+
+```python
+Route("/", endpoint=homepage)                      # GET + implicit HEAD
+Route("/", methods=["HEAD"], endpoint=custom_head)  # explicit HEAD, takes precedence
+```
+
 ## Submounting routes
 
 In large applications you might find that you want to break out parts of the
