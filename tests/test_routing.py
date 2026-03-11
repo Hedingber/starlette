@@ -1180,3 +1180,30 @@ def test_paths_with_root_path(test_client_factory: TestClientFactory) -> None:
         "path": "/root/root-queue/path",
         "root_path": "/root",
     }
+
+
+def test_explicit_head_route_takes_priority(test_client_factory: TestClientFactory) -> None:
+    """An explicitly defined HEAD route should take priority over the implicit HEAD
+    that is automatically added when a GET route is registered."""
+
+    def get_handler(request: Request) -> Response:
+        return Response("get response", media_type="text/plain")
+
+    def head_handler(request: Request) -> Response:
+        return Response(headers={"x-custom": "head-handler"})
+
+    app = Router(
+        routes=[
+            Route("/", get_handler, methods=["GET"]),
+            Route("/", head_handler, methods=["HEAD"]),
+        ]
+    )
+    client = test_client_factory(app)
+
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.text == "get response"
+
+    response = client.head("/")
+    assert response.status_code == 200
+    assert response.headers["x-custom"] == "head-handler"

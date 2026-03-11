@@ -228,10 +228,15 @@ class Route(BaseRoute):
 
         if methods is None:
             self.methods = None
+            self._implicit_head = False
         else:
-            self.methods = {method.upper() for method in methods}
-            if "GET" in self.methods:
+            explicit_methods = {method.upper() for method in methods}
+            self.methods = explicit_methods.copy()
+            if "GET" in self.methods and "HEAD" not in explicit_methods:
                 self.methods.add("HEAD")
+                self._implicit_head = True
+            else:
+                self._implicit_head = False
 
         self.path_regex, self.path_format, self.param_convertors = compile_path(path)
 
@@ -248,6 +253,8 @@ class Route(BaseRoute):
                 path_params.update(matched_params)
                 child_scope = {"endpoint": self.endpoint, "path_params": path_params}
                 if self.methods and scope["method"] not in self.methods:
+                    return Match.PARTIAL, child_scope
+                elif self._implicit_head and scope["method"] == "HEAD":
                     return Match.PARTIAL, child_scope
                 else:
                     return Match.FULL, child_scope
