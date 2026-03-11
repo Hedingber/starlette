@@ -1036,6 +1036,29 @@ def test_route_repr_without_methods() -> None:
     assert repr(route) == "Route(path='/welcome', name='Endpoint', methods=[])"
 
 
+def test_route_methods_default_function_endpoint_adds_get_and_head() -> None:
+    route = Route("/welcome", endpoint=homepage)
+    assert route.methods == {"GET", "HEAD"}
+
+
+def test_route_methods_explicit_get_adds_head_implicitly() -> None:
+    route = Route("/welcome", endpoint=homepage, methods=["GET"])
+    assert route.methods == {"GET", "HEAD"}
+    assert route._implicit_head_from_get is True
+
+
+def test_route_methods_explicit_get_and_head_marks_head_not_implicit() -> None:
+    route = Route("/welcome", endpoint=homepage, methods=["GET", "HEAD"])
+    assert route.methods == {"GET", "HEAD"}
+    assert route._implicit_head_from_get is False
+
+
+def test_route_methods_explicit_head_only_marks_head_not_implicit() -> None:
+    route = Route("/welcome", endpoint=homepage, methods=["HEAD"])
+    assert route.methods == {"HEAD"}
+    assert route._implicit_head_from_get is False
+
+
 def test_websocket_route_repr() -> None:
     route = WebSocketRoute("/ws", endpoint=websocket_endpoint)
     assert repr(route) == "WebSocketRoute(path='/ws', name='websocket_endpoint')"
@@ -1180,3 +1203,28 @@ def test_paths_with_root_path(test_client_factory: TestClientFactory) -> None:
         "path": "/root/root-queue/path",
         "root_path": "/root",
     }
+
+
+def test_explicit_head_route_overrides_implicit_head(test_client_factory: TestClientFactory) -> None:
+    calls: list[str] = []
+
+    async def homepage(request: Request) -> PlainTextResponse:
+        calls.append("GET")
+        return PlainTextResponse("Homepage")
+
+    async def head(request: Request) -> PlainTextResponse:
+        calls.append("HEAD")
+        return PlainTextResponse("")
+
+    routes = [
+        Route("/", endpoint=homepage),
+        Route("/", methods=["HEAD"], endpoint=head),
+    ]
+
+    app = Starlette(routes=routes)
+    client = test_client_factory(app)
+
+    response = client.head("/")
+    assert response.status_code == 200
+    assert response.text == ""
+    assert calls == ["HEAD"]

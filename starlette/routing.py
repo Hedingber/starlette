@@ -209,6 +209,8 @@ class Route(BaseRoute):
         self.endpoint = endpoint
         self.name = get_name(endpoint) if name is None else name
         self.include_in_schema = include_in_schema
+        self._implicit_head_from_get = False
+        self._explicit_head = False
 
         endpoint_handler = endpoint
         while isinstance(endpoint_handler, functools.partial):
@@ -229,8 +231,11 @@ class Route(BaseRoute):
         if methods is None:
             self.methods = None
         else:
-            self.methods = {method.upper() for method in methods}
-            if "GET" in self.methods:
+            input_methods = {method.upper() for method in methods}
+            self._explicit_head = "HEAD" in input_methods
+            self.methods = set(input_methods)
+            if "GET" in input_methods and "HEAD" not in input_methods:
+                self._implicit_head_from_get = True
                 self.methods.add("HEAD")
 
         self.path_regex, self.path_format, self.param_convertors = compile_path(path)
@@ -670,18 +675,36 @@ class Router:
             return
 
         partial = None
+        full_route = None
+        full_scope: Scope | None = None
+        full_route_has_explicit_head = False
 
         for route in self.routes:
             # Determine if any route matches the incoming scope,
             # and hand over to the matching route if found.
             match, child_scope = route.matches(scope)
             if match == Match.FULL:
-                scope.update(child_scope)
-                await route.handle(scope, receive, send)
-                return
+                is_head_request = scope["type"] == "http" and scope.get("method") == "HEAD"
+                methods = getattr(route, "methods", None)
+                has_explicit_head = bool(
+                    is_head_request
+                    and methods is not None
+                    and "HEAD" in methods
+                    and not getattr(route, "_implicit_head_from_get", False)
+                )
+
+                if full_route is None or (is_head_request and has_explicit_head and not full_route_has_explicit_head):
+                    full_route = route
+                    full_scope = child_scope
+                    full_route_has_explicit_head = has_explicit_head
             elif match == Match.PARTIAL and partial is None:
                 partial = route
                 partial_scope = child_scope
+
+        if full_route is not None and full_scope is not None:
+            scope.update(full_scope)
+            await full_route.handle(scope, receive, send)
+            return
 
         if partial is not None:
             #  Handle partial matches. These are cases where an endpoint is
